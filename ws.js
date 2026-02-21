@@ -1,9 +1,11 @@
 /**
- * @fileoverview Service Worker для оффлайн работы и кэширования
- * @version 2.0.0
+ * @fileoverview Service Worker для оффлайн работы
+ * @version 2.1.0
  */
 
-const CACHE_NAME = 'cards-cache-v2.0.0';
+const CACHE_NAME = 'cards-cache-v2.1.0';
+const SCOPE_PATH = '/cards/';
+
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -14,66 +16,64 @@ const ASSETS_TO_CACHE = [
     './icons/icon-512.png'
 ];
 
+// version.json НЕ кэшируем - всегда свежий из сети
+
 // ============================================
-// INSTALL EVENT - Кэширование файлов
+// INSTALL
 // ============================================
 self.addEventListener('install', (event) => {
-    console.log('[SW] Установка Service Worker');
-    
+    console.log('[SW] Install');
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then((cache) => {
-                console.log('[SW] Кэширование файлов');
-                return cache.addAll(ASSETS_TO_CACHE);
-            })
-            .then(() => {
-                console.log('[SW] Файлы закэшированы');
-                return self.skipWaiting();
-            })
-            .catch((error) => {
-                console.error('[SW] Ошибка кэширования:', error);
-            })
+            .then(cache => cache.addAll(ASSETS_TO_CACHE))
+            .then(() => self.skipWaiting())
+            .catch(err => console.error('[SW] Install error:', err))
     );
 });
 
 // ============================================
-// ACTIVATE EVENT - Очистка старого кэша
+// ACTIVATE
 // ============================================
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Активация Service Worker');
-    
+    console.log('[SW] Activate');
     event.waitUntil(
         caches.keys()
-            .then((cacheNames) => {
-                return Promise.all(
-                    cacheNames
-                        .filter((name) => name !== CACHE_NAME)
-                        .map((name) => {
-                            console.log('[SW] Удаление старого кэша:', name);
-                            return caches.delete(name);
-                        })
-                );
-            })
-            .then(() => {
-                console.log('[SW] Service Worker активирован');
-                return self.clients.claim();
-            })
+            .then(names => Promise.all(
+                names.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))
+            ))
+            .then(() => self.clients.claim())
     );
 });
 
 // ============================================
-// FETCH EVENT - Отдача из кэша
+// FETCH
 // ============================================
 self.addEventListener('fetch', (event) => {
+    const requestUrl = new URL(event.request.url);
+    
+    // version.json всегда из сети
+    if (requestUrl.pathname.includes('version.json')) {
+        return;
+    }
+    
+    // Обрабатываем только запросы в рамках scope
+    if (!requestUrl.pathname.startsWith(SCOPE_PATH) && requestUrl.origin === self.location.origin) {
+        return;
+    }
+    
     event.respondWith(
         caches.match(event.request)
-            .then((response) => {
-                // Возвращаем из кэша или загружаем из сети
-                return response || fetch(event.request);
+            .then(cached => {
+                if (cached) return cached;
+                return fetch(event.request).then(response => {
+                    if (event.request.method === 'GET' && response.ok) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+                    }
+                    return response;
+                });
             })
-            .catch((error) => {
-                console.error('[SW] Ошибка fetch:', error);
-                // Фолбэк для навигации
+            .catch(() => {
                 if (event.request.mode === 'navigate') {
                     return caches.match('./index.html');
                 }
@@ -82,11 +82,11 @@ self.addEventListener('fetch', (event) => {
 });
 
 // ============================================
-// SKIP_WAITING MESSAGE - Принудительное обновление
+// SKIP_WAITING
 // ============================================
 self.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'SKIP_WAITING') {
-        console.log('[SW] Получено сообщение SKIP_WAITING');
+    if (event.data?.type === 'SKIP_WAITING') {
+        console.log('[SW] Skip waiting');
         self.skipWaiting();
     }
 });

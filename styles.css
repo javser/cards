@@ -1,44 +1,27 @@
-/* ============================================
-   CSS VARIABLES & RESET
-   ============================================ */
 :root {
-    /* Colors */
     --color-bg-primary: #2c3e50;
     --color-bg-secondary: #34495e;
     --color-text-primary: #ecf0f1;
     --color-accent: #e74c3c;
     --color-success: #2ecc71;
     --color-muted: #7f8c8d;
-    
-    /* Spacing */
+    --color-update: #3498db;
     --spacing-xs: 5px;
     --spacing-sm: 10px;
     --spacing-md: 20px;
     --spacing-lg: 40px;
-    
-    /* Timing */
     --timing-fast: 0.1s;
     --timing-normal: 0.6s;
-    --timing-slow: 1s;
-    
-    /* Sizes */
     --size-card-gap: 10px;
     --size-card-radius: 8px;
     --size-button-width: 200px;
     --size-font-heading: 2.5rem;
     --size-font-button: 1.2rem;
+    --size-font-version: 0.75rem;
 }
 
-/* Reset */
-*, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ============================================
-   BASE STYLES
-   ============================================ */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: var(--color-bg-primary);
@@ -47,14 +30,12 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    overflow: hidden;    user-select: none;
+    overflow: hidden;
+    user-select: none;
     -webkit-tap-highlight-color: transparent;
     line-height: 1.5;
 }
 
-/* ============================================
-   SCREENS
-   ============================================ */
 .screen {
     display: none;
     flex-direction: column;
@@ -67,14 +48,8 @@ body {
     left: 0;
     padding: var(--spacing-md);
 }
+.screen--active { display: flex; }
 
-.screen--active {
-    display: flex;
-}
-
-/* ============================================
-   TYPOGRAPHY
-   ============================================ */
 .heading {
     font-size: var(--size-font-heading);
     text-transform: uppercase;
@@ -83,9 +58,13 @@ body {
     text-align: center;
 }
 
-/* ============================================
-   BUTTONS
-   ============================================ */
+.menu-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
 .btn {
     background: var(--color-accent);
     color: var(--color-text-primary);
@@ -96,32 +75,31 @@ body {
     border-radius: var(--size-card-radius);
     cursor: pointer;
     width: var(--size-button-width);
-    text-align: center;    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     transition: transform var(--timing-fast) ease;
     font-family: inherit;
     font-weight: 600;
 }
 
-.btn:hover {
-    filter: brightness(1.1);
+.btn:hover { filter: brightness(1.1); }
+.btn:active { transform: scale(0.95); }
+.btn:focus { outline: 3px solid var(--color-text-primary); outline-offset: 2px; }
+.btn--exit { background: var(--color-muted); }
+.btn--update { background: var(--color-update); display: none; }
+.btn--update.visible { display: block; }
+
+/* Версия приложения */
+.app-version {
+    position: fixed;
+    bottom: var(--spacing-sm);
+    right: var(--spacing-sm);
+    font-size: var(--size-font-version);
+    color: var(--color-muted);
+    opacity: 0.6;    pointer-events: none;
+    z-index: 1000;
 }
 
-.btn:active {
-    transform: scale(0.95);
-}
-
-.btn:focus {
-    outline: 3px solid var(--color-text-primary);
-    outline-offset: 2px;
-}
-
-.btn--exit {
-    background: var(--color-muted);
-}
-
-/* ============================================
-   GAME GRID
-   ============================================ */
 .game-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -132,9 +110,6 @@ body {
     aspect-ratio: 1 / 1;
 }
 
-/* ============================================
-   CARD COMPONENT (BEM)
-   ============================================ */
 .card {
     background-color: transparent;
     perspective: 1000px;
@@ -145,7 +120,8 @@ body {
 
 .card__inner {
     position: relative;
-    width: 100%;    height: 100%;
+    width: 100%;
+    height: 100%;
     text-align: center;
     transition: transform var(--timing-normal);
     transform-style: preserve-3d;
@@ -153,13 +129,8 @@ body {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
 
-.card--flipped .card__inner {
-    transform: rotateY(180deg);
-}
-
-.card--matched .card__inner {
-    box-shadow: 0 0 15px var(--color-success);
-}
+.card--flipped .card__inner { transform: rotateY(180deg); }
+.card--matched .card__inner { box-shadow: 0 0 15px var(--color-success); }
 
 .card__face {
     position: absolute;
@@ -175,39 +146,21 @@ body {
     font-weight: bold;
     color: var(--color-bg-primary);
 }
-
 .card__face--back {
     background-color: var(--color-bg-secondary);
     background-image: 
-        repeating-linear-gradient(
-            45deg,
-            rgba(255, 255, 255, 0.1) 0px,
-            rgba(255, 255, 255, 0.1) 10px,
-            transparent 10px,
-            transparent 20px
-        ),
-        repeating-linear-gradient(
-            -45deg,
-            rgba(255, 255, 255, 0.1) 0px,
-            rgba(255, 255, 255, 0.1) 10px,
-            transparent 10px,
-            transparent 20px
-        );
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 10px, transparent 10px, transparent 20px),
+        repeating-linear-gradient(-45deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 10px, transparent 10px, transparent 20px);
 }
+
 .card__face--front {
     background-color: var(--color-text-primary);
     transform: rotateY(180deg);
 }
 
-/* ============================================
-   MODAL
-   ============================================ */
 .modal {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.85);
     display: none;
     justify-content: center;
@@ -217,33 +170,19 @@ body {
     padding: var(--spacing-md);
 }
 
-.modal--visible {
+.modal--visible { display: flex; }
+.modal__title { color: var(--color-success); font-size: 3rem; margin-bottom: var(--spacing-md); text-align: center; }
+.modal__text { color: var(--color-text-primary); font-size: 1.2rem; text-align: center; margin-bottom: var(--spacing-md); }
+
+.modal-actions {
     display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
-.modal__title {
-    color: var(--color-success);
-    font-size: 3rem;
-    margin-bottom: var(--spacing-md);
-    text-align: center;
-}
-
-.modal__text {
-    color: var(--color-text-primary);
-    font-size: 1.2rem;
-    text-align: center;
-}
-
-/* ============================================
-   ACCESSIBILITY
-   ============================================ */
 @media (prefers-reduced-motion: reduce) {
-    .card__inner {
-        transition: none;
-    }
-    
-    .btn {
-        transition: none;    }
+    .card__inner, .btn { transition: none; }
 }
 
 @media (max-width: 480px) {
@@ -252,9 +191,5 @@ body {
         --size-font-button: 1rem;
         --size-button-width: 160px;
     }
-    
-    .game-grid {
-        width: 95vw;
-        gap: 5px;
-    }
+    .game-grid { width: 95vw; gap: 5px; }
 }
