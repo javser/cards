@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    const APP_VERSION = '2.1.6';
+    const APP_VERSION = '2.1.0';
     const STORAGE = { VERSION: 'cards_version', DECLINED: 'cards_declined', PENDING: 'cards_pending' };
 
     let swRegistration = null;
@@ -10,11 +10,9 @@
 
     // --- Проверка PWA ---
     function checkPWA() {
-        // Установленное приложение: standalone или service worker активен
         isPWA = window.matchMedia('(display-mode: standalone)').matches || 
                 window.navigator.standalone === true ||
                 (navigator.serviceWorker && navigator.serviceWorker.controller !== null);
-        console.log('[PWA] Is installed app:', isPWA);
     }
 
     // --- Версия ---
@@ -47,26 +45,23 @@
         document.getElementById('update-modal').classList.add('modal--visible');
     }
 
-    function hideUpdateModal() {        document.getElementById('update-modal').classList.remove('modal--visible');
+    function hideUpdateModal() {
+        document.getElementById('update-modal').classList.remove('modal--visible');
     }
-
     // --- Проверка обновлений ---
     async function checkForUpdates() {
+        // Всегда показываем версию (и сайт, и PWA)
         const current = getStoredVersion();
         showVersion(current);
 
-        // Если не PWA - не показываем обновления (сайт всегда актуален)
+        // Обновления только для PWA
         if (!isPWA) {
-            console.log('[UPDATE] Running on website, no update check needed');
             return;
         }
 
-        // Проверяем доступность сети
         const isOnline = navigator.onLine;
-        console.log('[UPDATE] PWA mode, Online:', isOnline);
 
         if (isOnline) {
-            // Есть сеть - проверяем версию
             try {
                 const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-cache' });
                 if (!res.ok) throw new Error('Network');
@@ -74,8 +69,6 @@
                 const data = await res.json();
                 availableVersion = data.version;
                 const declined = localStorage.getItem(STORAGE.DECLINED);
-
-                console.log('[UPDATE] Current:', current, 'Available:', availableVersion);
 
                 if (compareVersions(availableVersion, current) > 0 && 
                     (!declined || compareVersions(availableVersion, declined) > 0)) {
@@ -85,18 +78,16 @@
                     showUpdateButton();
                 }
             } catch (e) {
-                console.log('[UPDATE] Version check failed');
                 if (localStorage.getItem(STORAGE.PENDING) === 'true') {
                     showUpdateButton();
                 }
             }
         } else {
-            // Оффлайн - показываем кнопку если есть pending
-            console.log('[UPDATE] Offline mode');
             if (localStorage.getItem(STORAGE.PENDING) === 'true') {
                 showUpdateButton();
             }
-        }    }
+        }
+    }
 
     // --- Обновление ---
     function performUpdate() {
@@ -105,8 +96,7 @@
         }
         localStorage.setItem(STORAGE.PENDING, 'false');
         hideUpdateButton();
-        hideUpdateModal();
-        
+        hideUpdateModal();        
         if (swRegistration && swRegistration.waiting) {
             swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
         } else if (navigator.serviceWorker.controller) {
@@ -146,6 +136,7 @@
                 });
         }
     }
+
     // --- Игра ---
     const state = { cards: [], matched: 0, locked: false };
     
@@ -154,8 +145,7 @@
         grid.innerHTML = '';
         const values = [...Array(8)].map((_, i) => i + 1);
         const deck = [...values, ...values].sort(() => Math.random() - 0.5);
-        
-        deck.forEach((val, idx) => {
+                deck.forEach((val, idx) => {
             const card = document.createElement('div');
             card.className = 'card';
             card.dataset.value = val;
@@ -194,18 +184,17 @@
         }
     }
 
-    // --- Инициализация ---    function init() {
+    // --- Инициализация ---
+    function init() {
         checkPWA();
         registerSW();
         checkForUpdates();
 
-        // Меню
         document.getElementById('menu-screen').addEventListener('click', e => {
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
             
-            switch (btn.dataset.action) {
-                case 'start':
+            switch (btn.dataset.action) {                case 'start':
                     state.matched = 0;
                     state.cards = [];
                     state.locked = false;
@@ -222,7 +211,6 @@
             }
         });
 
-        // Модальное окно обновления
         document.getElementById('update-modal').addEventListener('click', e => {
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
@@ -234,16 +222,15 @@
             }
         });
 
-        // Кнопка обновления в меню
         document.querySelector('.btn--update').addEventListener('click', e => {
             e.stopPropagation();
             performUpdate();
         });
 
-        // Победа
         document.getElementById('win-modal').addEventListener('click', e => {
             if (e.target.id === 'win-modal') {
-                document.getElementById('win-modal').classList.remove('modal--visible');                document.getElementById('game-screen').classList.remove('screen--active');
+                document.getElementById('win-modal').classList.remove('modal--visible');
+                document.getElementById('game-screen').classList.remove('screen--active');
                 document.getElementById('menu-screen').classList.add('screen--active');
             }
         });
