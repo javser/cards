@@ -15,7 +15,6 @@
     <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-    <!-- Главное меню -->
     <section id="menu-screen" class="screen screen--active" aria-label="Главное меню">
         <h1 class="heading">Карточки</h1>
         <div class="menu-actions">
@@ -23,23 +22,18 @@
             <button class="btn btn--update" data-action="update" aria-label="Обновить приложение">Обновить</button>
             <button class="btn btn--exit" data-action="exit" aria-label="Выйти из приложения">Выход</button>
         </div>
-        
-        <!-- Версия приложения -->
-        <div class="app-version" id="app-version">v2.1.0</div>
+        <div class="app-version" id="app-version"></div>
     </section>
 
-    <!-- Экран игры -->
     <section id="game-screen" class="screen" aria-label="Игровое поле">
         <div class="game-grid" id="game-grid" role="grid" aria-label="Игровое поле 4 на 4"></div>
     </section>
 
-    <!-- Модальное окно победы -->
     <div id="win-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="win-title">
         <h2 id="win-title" class="modal__title">Поздравляю!</h2>
         <p class="modal__text">Нажмите, чтобы продолжить</p>
     </div>
 
-    <!-- Уведомление об обновлении -->
     <div id="update-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="update-title">
         <h2 id="update-title" class="modal__title">Доступно обновление</h2>
         <p class="modal__text" id="update-changelog">Новая версия готова к установке</p>

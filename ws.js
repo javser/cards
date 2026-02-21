@@ -1,9 +1,11 @@
 /**
  * @fileoverview Service Worker для оффлайн работы
- * @version 2.1.0
+ * @note Версия кэша устанавливается из app.js автоматически
  */
 
-const CACHE_NAME = 'cards-cache-v2.1.0';
+let CACHE_VERSION = 'v2.1.0'; // Значение по умолчанию (будет перезаписано)
+let CACHE_NAME = 'cards-cache-' + CACHE_VERSION;
+
 const SCOPE_PATH = '/cards/';
 
 const ASSETS_TO_CACHE = [
@@ -16,13 +18,27 @@ const ASSETS_TO_CACHE = [
     './icons/icon-512.png'
 ];
 
-// version.json НЕ кэшируем - всегда свежий из сети
+// ============================================
+// MESSAGE HANDLER (получение версии из app.js)
+// ============================================
+self.addEventListener('message', (event) => {
+    if (event.data?.type === 'SET_VERSION') {
+        CACHE_VERSION = event.data.version;
+        CACHE_NAME = 'cards-cache-' + CACHE_VERSION;
+        console.log('[SW] Version set from app.js:', CACHE_VERSION);
+    }
+    
+    if (event.data?.type === 'SKIP_WAITING') {
+        console.log('[SW] Skip waiting');
+        self.skipWaiting();
+    }
+});
 
 // ============================================
 // INSTALL
 // ============================================
 self.addEventListener('install', (event) => {
-    console.log('[SW] Install');
+    console.log('[SW] Install', CACHE_NAME);
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => cache.addAll(ASSETS_TO_CACHE))
@@ -35,7 +51,7 @@ self.addEventListener('install', (event) => {
 // ACTIVATE
 // ============================================
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activate');
+    console.log('[SW] Activate', CACHE_NAME);
     event.waitUntil(
         caches.keys()
             .then(names => Promise.all(
@@ -79,14 +95,4 @@ self.addEventListener('fetch', (event) => {
                 }
             })
     );
-});
-
-// ============================================
-// SKIP_WAITING
-// ============================================
-self.addEventListener('message', (event) => {
-    if (event.data?.type === 'SKIP_WAITING') {
-        console.log('[SW] Skip waiting');
-        self.skipWaiting();
-    }
 });

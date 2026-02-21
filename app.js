@@ -1,10 +1,14 @@
 /**
  * @fileoverview Игра "Карточки" - классическая игра на память
- * @version 2.1.0 (PWA + Update System)
  */
 
 (function() {
     'use strict';
+
+    // ============================================
+    // ГЛОБАЛЬНАЯ ВЕРСИЯ (МЕНЯТЬ ТОЛЬКО ЗДЕСЬ!)
+    // ============================================
+    const APP_VERSION = '2.1.1';
 
     const CONFIG = {
         GRID_SIZE: 4,
@@ -40,18 +44,17 @@
         flippedCards: [],
         matchedPairs: 0,
         isLocked: false,
-        currentVersion: '2.1.0',
         availableVersion: null,
         changelog: ''
     };
-
     const elements = {};
 
-    // ============================================    // VERSION MANAGEMENT
+    // ============================================
+    // VERSION MANAGEMENT
     // ============================================
     
     function getCurrentVersion() {
-        return localStorage.getItem(CONFIG.STORAGE_KEYS.APP_VERSION) || gameState.currentVersion;
+        return localStorage.getItem(CONFIG.STORAGE_KEYS.APP_VERSION) || APP_VERSION;
     }
 
     function getDeclinedVersion() {
@@ -70,6 +73,10 @@
         localStorage.setItem(CONFIG.STORAGE_KEYS.PENDING_UPDATE, pending ? 'true' : 'false');
     }
 
+    function setCurrentVersion(version) {
+        localStorage.setItem(CONFIG.STORAGE_KEYS.APP_VERSION, version);
+    }
+
     function compareVersions(v1, v2) {
         const parts1 = v1.split('.').map(Number);
         const parts2 = v2.split('.').map(Number);
@@ -86,44 +93,37 @@
 
     async function checkForUpdates() {
         try {
-            // Запрос с bypass кэша
             const timestamp = Date.now();
             const response = await fetch(`${CONFIG.VERSION_URL}?t=${timestamp}`, {
                 cache: 'no-cache',
-                headers: { 'Cache-Control': 'no-cache' }
-            });
+                headers: { 'Cache-Control': 'no-cache' }            });
             
             if (!response.ok) throw new Error('Network error');
             
             const data = await response.json();
-            const availableVersion = data.version;            const currentVersion = getCurrentVersion();
+            const availableVersion = data.version;
+            const currentVersion = getCurrentVersion();
             const declinedVersion = getDeclinedVersion();
             
             console.log('[VERSION] Current:', currentVersion, 'Available:', availableVersion, 'Declined:', declinedVersion);
             
-            // Сохраняем доступную версию
             gameState.availableVersion = availableVersion;
             gameState.changelog = data.changelog || '';
             
-            // Проверяем нужно ли показывать обновление
             const isNewer = compareVersions(availableVersion, currentVersion) > 0;
             const isNotDeclined = !declinedVersion || compareVersions(availableVersion, declinedVersion) > 0;
             
             if (isNewer && isNotDeclined) {
-                // Есть новая версия которую ещё не предлагали
                 setPendingUpdate(true);
                 showUpdateModal(data);
             } else if (hasPendingUpdate()) {
-                // Пользователь ранее отказался, показываем кнопку
                 showUpdateButton();
             }
             
-            // Обновляем UI версии
             updateVersionUI(currentVersion);
             
         } catch (error) {
-            console.log('[VERSION] Offline mode or error:', error.message);
-            // Работаем в оффлайн режиме
+            console.log('[VERSION] Offline mode:', error.message);
             const currentVersion = getCurrentVersion();
             updateVersionUI(currentVersion);
             
@@ -174,30 +174,27 @@
     }
 
     function performUpdate() {
-        // Сообщаем Service Worker о необходимости обновления
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
             navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
         }
         
-        // Очищаем pending update
+        if (gameState.availableVersion) {
+            setCurrentVersion(gameState.availableVersion);
+        }
+        
         setPendingUpdate(false);
         hideUpdateButton();
         hideUpdateModal();
         
-        // Перезагружаем страницу
         window.location.reload();
     }
 
     function declineUpdate() {
         if (gameState.availableVersion) {
-            // Запоминаем от какой версии отказались
             setDeclinedVersion(gameState.availableVersion);
         }
         
-        // Скрываем модальное окно но оставляем pending для кнопки        hideUpdateModal();
-        
-        // Показываем кнопку обновления на главном экране
-        showUpdateButton();
+        hideUpdateModal();        showUpdateButton();
     }
 
     // ============================================
@@ -211,18 +208,34 @@
                     .then(registration => {
                         console.log('[PWA] SW registered:', registration.scope);
                         
-                        // Слушаем обновления SW
+                        // Отправляем версию в Service Worker
                         registration.addEventListener('updatefound', () => {
                             const newWorker = registration.installing;
                             if (!newWorker) return;
 
+                            // Ждём когда SW будет готов к сообщениям
                             newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed') {
+                                    // Отправляем версию для кэша
+                                    newWorker.postMessage({
+                                        type: 'SET_VERSION',
+                                        version: APP_VERSION
+                                    });
+                                }
+                                
                                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    // Новая версия SW готова
                                     console.log('[PWA] New SW version available');
                                 }
                             });
                         });
+
+                        // Сообщаем активному SW о версии
+                        if (registration.active) {
+                            registration.active.postMessage({
+                                type: 'SET_VERSION',
+                                version: APP_VERSION
+                            });
+                        }
                     })
                     .catch(error => {
                         console.error('[PWA] SW registration failed:', error);
@@ -230,7 +243,6 @@
             });
         }
     }
-
     // ============================================
     // GAME LOGIC
     // ============================================
@@ -243,6 +255,7 @@
         }
         return shuffled;
     }
+
     function createCardValues(pairs) {
         const values = Array.from({ length: pairs }, (_, i) => i + 1);
         return [...values, ...values];
@@ -279,10 +292,8 @@
         
         return card;
     }
-
     function handleCardClick(event) {
-        const card = event.currentTarget;
-        flipCard(card);
+        flipCard(event.currentTarget);
     }
 
     function handleCardKeydown(event) {
@@ -292,7 +303,8 @@
         }
     }
 
-    function flipCard(card) {        if (gameState.isLocked) return;
+    function flipCard(card) {
+        if (gameState.isLocked) return;
         if (card.classList.contains(CONFIG.CLASSES.CARD_FLIPPED)) return;
 
         card.classList.add(CONFIG.CLASSES.CARD_FLIPPED);
@@ -329,8 +341,7 @@
 
     function handleMismatch(card1, card2) {
         setTimeout(() => {
-            card1.classList.remove(CONFIG.CLASSES.CARD_FLIPPED);
-            card2.classList.remove(CONFIG.CLASSES.CARD_FLIPPED);
+            card1.classList.remove(CONFIG.CLASSES.CARD_FLIPPED);            card2.classList.remove(CONFIG.CLASSES.CARD_FLIPPED);
             gameState.flippedCards = [];
             gameState.isLocked = false;
         }, CONFIG.FLIP_DELAY);
@@ -341,7 +352,8 @@
     // ============================================
     
     function showWinModal() {
-        elements.winModal.classList.add(CONFIG.CLASSES.MODAL_VISIBLE);    }
+        elements.winModal.classList.add(CONFIG.CLASSES.MODAL_VISIBLE);
+    }
 
     function hideWinModal() {
         elements.winModal.classList.remove(CONFIG.CLASSES.MODAL_VISIBLE);
@@ -378,23 +390,13 @@
 
     function handleMenuClick(event) {
         const button = event.target.closest('[data-action]');
-        if (!button) return;
-        
+        if (!button) return;        
         switch (button.dataset.action) {
-            case 'start':
-                startGame();
-                break;
-            case 'exit':
-                exitApp();
-                break;
-            case 'update':
-                performUpdate();
-                break;
-            case 'confirm-update':                performUpdate();
-                break;
-            case 'decline-update':
-                declineUpdate();
-                break;
+            case 'start': startGame(); break;
+            case 'exit': exitApp(); break;
+            case 'update': performUpdate(); break;
+            case 'confirm-update': performUpdate(); break;
+            case 'decline-update': declineUpdate(); break;
         }
     }
 
@@ -422,13 +424,10 @@
             }
         });
 
-        // Регистрация Service Worker
         registerServiceWorker();
-        
-        // Проверка обновлений
         checkForUpdates();
         
-        console.log('[APP] Cards game initialized');
+        console.log('[APP] Cards game initialized v' + APP_VERSION);
     }
 
     if (document.readyState === 'loading') {
