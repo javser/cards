@@ -1,4 +1,4 @@
-let CACHE_VERSION = 'v2.1.5';
+let CACHE_VERSION = 'v2.1.6';
 let CACHE_NAME = 'cards-cache-' + CACHE_VERSION;
 
 const ASSETS = ['./', './index.html', './styles.css', './app.js', './manifest.json', 
