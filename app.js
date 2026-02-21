@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    const APP_VERSION = '2.1.0';
+    const APP_VERSION = '2.1.7';
     const STORAGE = { VERSION: 'cards_version', DECLINED: 'cards_declined', PENDING: 'cards_pending' };
 
     let swRegistration = null;
