@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    const APP_VERSION = '2.1.3';
+    const APP_VERSION = '2.1.4';
     const STORAGE = {
         VERSION: 'cards_version',
         DECLINED: 'cards_declined',
