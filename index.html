@@ -2,41 +2,37 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Игра Карточки - классическая игра на память">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#2c3e50">
-    
     <base href="./">
-    
     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    
     <title>Карточки</title>
     <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-    <section id="menu-screen" class="screen screen--active" aria-label="Главное меню">
+    <section id="menu-screen" class="screen screen--active">
         <h1 class="heading">Карточки</h1>
         <div class="menu-actions">
-            <button class="btn" data-action="start" aria-label="Начать игру">Играть</button>
-            <button class="btn btn--update" data-action="update" aria-label="Обновить приложение">Обновить</button>
-            <button class="btn btn--exit" data-action="exit" aria-label="Выйти из приложения">Выход</button>
+            <button class="btn" data-action="start">Играть</button>
+            <button class="btn btn--update" data-action="update">Обновить</button>
+            <button class="btn btn--exit" data-action="exit">Выход</button>
         </div>
         <div class="app-version" id="app-version"></div>
     </section>
 
-    <section id="game-screen" class="screen" aria-label="Игровое поле">
-        <div class="game-grid" id="game-grid" role="grid" aria-label="Игровое поле 4 на 4"></div>
+    <section id="game-screen" class="screen">
+        <div class="game-grid" id="game-grid"></div>
     </section>
 
-    <div id="win-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="win-title">
-        <h2 id="win-title" class="modal__title">Поздравляю!</h2>
-        <p class="modal__text">Нажмите, чтобы продолжить</p>
+    <div id="win-modal" class="modal">
+        <h2 class="modal__title">Поздравляю!</h2>
+        <p class="modal__text">Нажмите чтобы продолжить</p>
     </div>
 
-    <div id="update-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="update-title">
-        <h2 id="update-title" class="modal__title">Доступно обновление</h2>
-        <p class="modal__text" id="update-changelog">Новая версия готова к установке</p>
+    <div id="update-modal" class="modal">
+        <h2 class="modal__title">Доступно обновление</h2>
+        <p class="modal__text" id="update-changelog"></p>
         <div class="modal-actions">
             <button class="btn" data-action="confirm-update">Обновить</button>
             <button class="btn btn--exit" data-action="decline-update">Позже</button>

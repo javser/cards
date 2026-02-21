@@ -1,496 +1,213 @@
-/**
- * @fileoverview Игра "Карточки" - классическая игра на память
- */
-
 (function() {
     'use strict';
 
-    // ============================================
-    // ГЛОБАЛЬНАЯ ВЕРСИЯ (МЕНЯТЬ ТОЛЬКО ЗДЕСЬ!)
-    // ============================================
-    const APP_VERSION = '2.1.2';
-
-    const CONFIG = {
-        GRID_SIZE: 4,
-        TOTAL_PAIRS: 8,
-        FLIP_DELAY: 1000,
-        WIN_DELAY: 500,
-        VERSION_URL: './version.json',
-        STORAGE_KEYS: {
-            APP_VERSION: 'cards_app_version',
-            DECLINED_VERSION: 'cards_declined_version',
-            PENDING_UPDATE: 'cards_pending_update'
-        },
-        SELECTORS: {
-            MENU_SCREEN: '#menu-screen',
-            GAME_SCREEN: '#game-screen',
-            GAME_GRID: '#game-grid',
-            WIN_MODAL: '#win-modal',
-            UPDATE_MODAL: '#update-modal',
-            APP_VERSION: '#app-version',
-            UPDATE_BUTTON: '.btn--update',
-            UPDATE_CHANGELOG: '#update-changelog'
-        },
-        CLASSES: {
-            SCREEN_ACTIVE: 'screen--active',
-            CARD_FLIPPED: 'card--flipped',
-            CARD_MATCHED: 'card--matched',
-            MODAL_VISIBLE: 'modal--visible',
-            VISIBLE: 'visible'
-        }
+    const APP_VERSION = '2.1.3';
+    const STORAGE = {
+        VERSION: 'cards_version',
+        DECLINED: 'cards_declined',
+        PENDING: 'cards_pending'
     };
 
-    const gameState = {
-        flippedCards: [],
-        matchedPairs: 0,
-        isLocked: false,
-        availableVersion: null,
-        changelog: '',
-        swRegistration: null
-    };
-    const elements = {};
+    let swRegistration = null;
+    let availableVersion = null;
 
-    // ============================================
-    // VERSION MANAGEMENT
-    // ============================================
-    
-    function getCurrentVersion() {
-        return localStorage.getItem(CONFIG.STORAGE_KEYS.APP_VERSION) || APP_VERSION;
-    }
-
-    function getDeclinedVersion() {
-        return localStorage.getItem(CONFIG.STORAGE_KEYS.DECLINED_VERSION) || null;
-    }
-
-    function setDeclinedVersion(version) {
-        localStorage.setItem(CONFIG.STORAGE_KEYS.DECLINED_VERSION, version);
-    }
-
-    function hasPendingUpdate() {
-        return localStorage.getItem(CONFIG.STORAGE_KEYS.PENDING_UPDATE) === 'true';
-    }
-
-    function setPendingUpdate(pending) {
-        localStorage.setItem(CONFIG.STORAGE_KEYS.PENDING_UPDATE, pending ? 'true' : 'false');
-    }
-
-    function setCurrentVersion(version) {
-        localStorage.setItem(CONFIG.STORAGE_KEYS.APP_VERSION, version);
+    // --- Версия ---
+    function getStoredVersion() {
+        return localStorage.getItem(STORAGE.VERSION) || APP_VERSION;
     }
 
     function compareVersions(v1, v2) {
-        const parts1 = v1.split('.').map(Number);
-        const parts2 = v2.split('.').map(Number);
-        
-        for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
-            const num1 = parts1[i] || 0;
-            const num2 = parts2[i] || 0;
-            
-            if (num1 > num2) return 1;
-            if (num1 < num2) return -1;
-        }
-        return 0;
+        return v1.localeCompare(v2, undefined, { numeric: true });
     }
 
-    function updateVersionUI(version) {
-        const versionElement = document.querySelector(CONFIG.SELECTORS.APP_VERSION);
-        console.log('[VERSION] Updating UI to:', version, 'Element found:', !!versionElement);
-        if (versionElement) {
-            versionElement.textContent = 'v' + version;        }
+    function showVersion(version) {
+        const el = document.getElementById('app-version');
+        if (el) el.textContent = 'v' + version;
     }
 
     function showUpdateButton() {
-        const updateButton = document.querySelector(CONFIG.SELECTORS.UPDATE_BUTTON);
-        if (updateButton) {
-            updateButton.classList.add(CONFIG.CLASSES.VISIBLE);
-            console.log('[VERSION] Update button shown');
-        }
+        const btn = document.querySelector('.btn--update');
+        if (btn) btn.classList.add('visible');
     }
 
     function hideUpdateButton() {
-        const updateButton = document.querySelector(CONFIG.SELECTORS.UPDATE_BUTTON);
-        if (updateButton) {
-            updateButton.classList.remove(CONFIG.CLASSES.VISIBLE);
-        }
+        const btn = document.querySelector('.btn--update');
+        if (btn) btn.classList.remove('visible');
     }
 
-    function showUpdateModal(data) {
-        const modal = document.querySelector(CONFIG.SELECTORS.UPDATE_MODAL);
-        const changelogEl = document.querySelector(CONFIG.SELECTORS.UPDATE_CHANGELOG);
-        
-        if (changelogEl && data.changelog) {
-            changelogEl.textContent = data.changelog;
-        }
-        
-        if (modal) {
-            modal.classList.add(CONFIG.CLASSES.MODAL_VISIBLE);
-            console.log('[VERSION] Update modal shown');
-        }
+    function showUpdateModal(changelog) {
+        const el = document.getElementById('update-changelog');
+        if (el && changelog) el.textContent = changelog;
+        document.getElementById('update-modal').classList.add('modal--visible');
     }
 
     function hideUpdateModal() {
-        const modal = document.querySelector(CONFIG.SELECTORS.UPDATE_MODAL);
-        if (modal) {
-            modal.classList.remove(CONFIG.CLASSES.MODAL_VISIBLE);
-        }
+        document.getElementById('update-modal').classList.remove('modal--visible');
     }
 
     async function checkForUpdates() {
-        console.log('[VERSION] Checking for updates...');
-        
+        const current = getStoredVersion();
+        showVersion(current);
         try {
-            // Запрос с bypass кэша
-            const timestamp = Date.now();
-            const response = await fetch(CONFIG.VERSION_URL + '?t=' + timestamp, {
-                cache: 'no-cache',
-                headers: { 
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',                    'Expires': '0'
-                }
-            });
+            const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-cache' });
+            if (!res.ok) throw new Error('Network');
             
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status);
-            }
-            
-            const data = await response.json();
-            const availableVersion = data.version;
-            const currentVersion = getCurrentVersion();
-            const declinedVersion = getDeclinedVersion();
-            
-            console.log('[VERSION] Current:', currentVersion);
-            console.log('[VERSION] Available:', availableVersion);
-            console.log('[VERSION] Declined:', declinedVersion);
-            
-            gameState.availableVersion = availableVersion;
-            gameState.changelog = data.changelog || '';
-            
-            // Всегда показываем текущую версию в UI
-            updateVersionUI(currentVersion);
-            
-            // Проверяем нужно ли показывать обновление
-            const isNewer = compareVersions(availableVersion, currentVersion) > 0;
-            const isNotDeclined = !declinedVersion || compareVersions(availableVersion, declinedVersion) > 0;
-            
-            console.log('[VERSION] Is newer:', isNewer, 'Is not declined:', isNotDeclined);
-            
-            if (isNewer && isNotDeclined) {
-                console.log('[VERSION] Showing update notification');
-                setPendingUpdate(true);
-                showUpdateModal(data);
-            } else if (hasPendingUpdate()) {
-                console.log('[VERSION] Showing update button (previously declined)');
+            const data = await res.json();
+            availableVersion = data.version;
+            const declined = localStorage.getItem(STORAGE.DECLINED);
+
+            if (compareVersions(availableVersion, current) > 0 && 
+                (!declined || compareVersions(availableVersion, declined) > 0)) {
+                
+                localStorage.setItem(STORAGE.PENDING, 'true');
+                showUpdateModal(data.changelog);
+            } else if (localStorage.getItem(STORAGE.PENDING) === 'true') {
                 showUpdateButton();
             }
-            
-        } catch (error) {
-            console.log('[VERSION] Offline mode or error:', error.message);
-            // Работаем в оффлайн режиме
-            const currentVersion = getCurrentVersion();
-            updateVersionUI(currentVersion);
-            
-            if (hasPendingUpdate()) {
+        } catch (e) {
+            console.log('Offline mode');
+            if (localStorage.getItem(STORAGE.PENDING) === 'true') {
                 showUpdateButton();
             }
         }
     }
+
     function performUpdate() {
-        console.log('[VERSION] Performing update...');
-        
-        if (gameState.swRegistration && gameState.swRegistration.waiting) {
-            gameState.swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
-            console.log('[VERSION] Sent SKIP_WAITING to SW');
-        } else if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
-            console.log('[VERSION] Sent SKIP_WAITING to active SW');
+        if (availableVersion) {
+            localStorage.setItem(STORAGE.VERSION, availableVersion);
         }
-        
-        if (gameState.availableVersion) {
-            setCurrentVersion(gameState.availableVersion);
-        }
-        
-        setPendingUpdate(false);
+        localStorage.setItem(STORAGE.PENDING, 'false');
         hideUpdateButton();
         hideUpdateModal();
         
-        // Небольшая задержка перед перезагрузкой
-        setTimeout(function() {
-            window.location.reload();
-        }, 500);
+        if (swRegistration && swRegistration.waiting) {
+            swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        } else if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+        }
+        
+        setTimeout(() => location.reload(), 500);
     }
 
     function declineUpdate() {
-        console.log('[VERSION] Update declined');
-        if (gameState.availableVersion) {
-            setDeclinedVersion(gameState.availableVersion);
+        if (availableVersion) {
+            localStorage.setItem(STORAGE.DECLINED, availableVersion);
         }
-        
         hideUpdateModal();
         showUpdateButton();
     }
-
-    // ============================================
-    // SERVICE WORKER REGISTRATION
-    // ============================================
-    
-    function registerServiceWorker() {
+    // --- Service Worker ---
+    function registerSW() {
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                console.log('[PWA] Registering Service Worker...');
-                
-                navigator.serviceWorker.register('./sw.js', { scope: './' })
-                    .then(function(registration) {
-                        console.log('[PWA] SW registered:', registration.scope);
-                        gameState.swRegistration = registration;
-                        
-                        // Отправляем версию сразу после регистрации                        sendVersionToSW(registration);
-                        
-                        // Слушаем обновления SW
-                        registration.addEventListener('updatefound', function() {
-                            console.log('[PWA] New SW installing...');
-                            const newWorker = registration.installing;
-                            if (!newWorker) return;
-
-                            newWorker.addEventListener('statechange', function() {
-                                console.log('[PWA] SW state:', newWorker.state);
-                                
+            navigator.serviceWorker.register('./sw.js', { scope: './' })
+                .then(reg => {
+                    swRegistration = reg;
+                    if (reg.active) {
+                        reg.active.postMessage({ type: 'SET_VERSION', version: APP_VERSION });
+                    }
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        if (newWorker) {
+                            newWorker.addEventListener('statechange', () => {
                                 if (newWorker.state === 'installed') {
-                                    // Отправляем версию новому SW
-                                    sendVersionToSW(registration);
-                                }
-                                
-                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('[PWA] New SW version available');
+                                    newWorker.postMessage({ type: 'SET_VERSION', version: APP_VERSION });
                                 }
                             });
-                        });
-                    })
-                    .catch(function(error) {
-                        console.error('[PWA] SW registration failed:', error);
+                        }
                     });
-            });
-        } else {
-            console.log('[PWA] Service Worker not supported');
+                });
         }
     }
 
-    function sendVersionToSW(registration) {
-        // Отправляем версию активному SW
-        if (registration.active) {
-            registration.active.postMessage({
-                type: 'SET_VERSION',
-                version: APP_VERSION
-            });
-            console.log('[PWA] Sent version to active SW:', APP_VERSION);
-        }
-        
-        // Отправляем версию ожидающему SW
-        if (registration.waiting) {
-            registration.waiting.postMessage({
-                type: 'SET_VERSION',
-                version: APP_VERSION
-            });
-            console.log('[PWA] Sent version to waiting SW:', APP_VERSION);
-        }
-                // Отправляем версию устанавливаемому SW
-        if (registration.installing) {
-            registration.installing.postMessage({
-                type: 'SET_VERSION',
-                version: APP_VERSION
-            });
-            console.log('[PWA] Sent version to installing SW:', APP_VERSION);
-        }
-    }
-
-    // ============================================
-    // GAME LOGIC
-    // ============================================
+    // --- Игра ---
+    const state = { cards: [], matched: 0, locked: false };
     
-    function shuffleArray(array) {
-        const shuffled = [...array];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-        }
-        return shuffled;
-    }
-
-    function createCardValues(pairs) {
-        const values = Array.from({ length: pairs }, function(_, i) { return i + 1; });
-        return [...values, ...values];
-    }
-
     function createBoard() {
-        const deck = shuffleArray(createCardValues(CONFIG.TOTAL_PAIRS));
-        elements.gameGrid.innerHTML = '';
+        const grid = document.getElementById('game-grid');
+        grid.innerHTML = '';
+        const values = [...Array(8)].map((_, i) => i + 1);
+        const deck = [...values, ...values].sort(() => Math.random() - 0.5);
         
-        deck.forEach(function(value, index) {
-            const card = createCardElement(value, index);
-            elements.gameGrid.appendChild(card);
+        deck.forEach((val, idx) => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.dataset.value = val;
+            card.innerHTML = '<div class="card__inner"><div class="card__face card__face--back"></div>' +
+                           '<div class="card__face card__face--front">' + val + '</div></div>';
+            card.onclick = () => flipCard(card);
+            grid.appendChild(card);
         });
-    }
-
-    function createCardElement(value, index) {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.dataset.value = value;
-        card.dataset.index = index;
-        card.setAttribute('role', 'button');
-        card.setAttribute('tabindex', '0');
-        card.setAttribute('aria-label', 'Карта ' + (index + 1));
-        
-        card.innerHTML = 
-            '<div class="card__inner">' +
-                '<div class="card__face card__face--back"></div>' +                '<div class="card__face card__face--front">' + value + '</div>' +
-            '</div>';
-        
-        card.addEventListener('click', handleCardClick);
-        card.addEventListener('keydown', handleCardKeydown);
-        
-        return card;
-    }
-
-    function handleCardClick(event) {
-        flipCard(event.currentTarget);
-    }
-
-    function handleCardKeydown(event) {
-        if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            flipCard(event.currentTarget);
-        }
     }
 
     function flipCard(card) {
-        if (gameState.isLocked) return;
-        if (card.classList.contains(CONFIG.CLASSES.CARD_FLIPPED)) return;
-
-        card.classList.add(CONFIG.CLASSES.CARD_FLIPPED);
-        gameState.flippedCards.push(card);
-
-        if (gameState.flippedCards.length === 2) {
-            checkForMatch();
-        }
-    }
-
-    function checkForMatch() {
-        gameState.isLocked = true;
-        const card1 = gameState.flippedCards[0];
-        const card2 = gameState.flippedCards[1];
-        const isMatch = card1.dataset.value === card2.dataset.value;
-
-        if (isMatch) {
-            handleMatch(card1, card2);
-        } else {
-            handleMismatch(card1, card2);
-        }
-    }
-
-    function handleMatch(card1, card2) {
-        card1.classList.add(CONFIG.CLASSES.CARD_MATCHED);
-        card2.classList.add(CONFIG.CLASSES.CARD_MATCHED);
-        gameState.matchedPairs++;
-        gameState.flippedCards = [];        gameState.isLocked = false;
-
-        if (gameState.matchedPairs === CONFIG.TOTAL_PAIRS) {
-            setTimeout(showWinModal, CONFIG.WIN_DELAY);
-        }
-    }
-
-    function handleMismatch(card1, card2) {
-        setTimeout(function() {
-            card1.classList.remove(CONFIG.CLASSES.CARD_FLIPPED);
-            card2.classList.remove(CONFIG.CLASSES.CARD_FLIPPED);
-            gameState.flippedCards = [];
-            gameState.isLocked = false;
-        }, CONFIG.FLIP_DELAY);
-    }
-
-    // ============================================
-    // UI FUNCTIONS
-    // ============================================
-    
-    function showWinModal() {
-        elements.winModal.classList.add(CONFIG.CLASSES.MODAL_VISIBLE);
-    }
-
-    function hideWinModal() {
-        elements.winModal.classList.remove(CONFIG.CLASSES.MODAL_VISIBLE);
-        showScreen('menu');
-        resetGame();
-    }
-
-    function showScreen(screenName) {
-        elements.menuScreen.classList.toggle(CONFIG.CLASSES.SCREEN_ACTIVE, screenName === 'menu');
-        elements.gameScreen.classList.toggle(CONFIG.CLASSES.SCREEN_ACTIVE, screenName === 'game');
-    }
-
-    function resetGame() {
-        gameState.flippedCards = [];
-        gameState.matchedPairs = 0;
-        gameState.isLocked = false;
-    }
-
-    function startGame() {
-        resetGame();
-        createBoard();
-        showScreen('game');
-    }
-
-    function exitApp() {
-        if (confirm('Вы действительно хотите выйти?')) {
-            window.close();            document.body.innerHTML = 
-                '<div style="display:flex;justify-content:center;align-items:center;height:100vh;color:white;text-align:center;padding:20px">' +
-                    '<div><h1>Приложение можно закрыть</h1><p>Нажмите кнопку "Назад" на устройстве</p></div>' +
-                '</div>';
-        }
-    }
-
-    function handleMenuClick(event) {
-        const button = event.target.closest('[data-action]');
-        if (!button) return;
+        if (state.locked || card.classList.contains('card--flipped')) return;
+        card.classList.add('card--flipped');
+        state.cards.push(card);
         
-        switch (button.dataset.action) {
-            case 'start': startGame(); break;
-            case 'exit': exitApp(); break;
-            case 'update': performUpdate(); break;
-            case 'confirm-update': performUpdate(); break;
-            case 'decline-update': declineUpdate(); break;
+        if (state.cards.length === 2) {
+            state.locked = true;            const [c1, c2] = state.cards;
+            if (c1.dataset.value === c2.dataset.value) {
+                c1.classList.add('card--matched');
+                c2.classList.add('card--matched');
+                state.matched++;
+                state.cards = [];
+                state.locked = false;
+                if (state.matched === 8) {
+                    setTimeout(() => document.getElementById('win-modal').classList.add('modal--visible'), 500);
+                }
+            } else {
+                setTimeout(() => {
+                    c1.classList.remove('card--flipped');
+                    c2.classList.remove('card--flipped');
+                    state.cards = [];
+                    state.locked = false;
+                }, 1000);
+            }
         }
     }
 
-    // ============================================
-    // INITIALIZATION
-    // ============================================
-    
+    // --- Инициализация ---
     function init() {
-        console.log('[APP] Initializing...');
-        
-        elements.menuScreen = document.querySelector(CONFIG.SELECTORS.MENU_SCREEN);
-        elements.gameScreen = document.querySelector(CONFIG.SELECTORS.GAME_SCREEN);
-        elements.gameGrid = document.querySelector(CONFIG.SELECTORS.GAME_GRID);
-        elements.winModal = document.querySelector(CONFIG.SELECTORS.WIN_MODAL);
+        registerSW();
+        checkForUpdates();
 
-        if (!elements.menuScreen || !elements.gameScreen || !elements.gameGrid || !elements.winModal) {
-            console.error('[APP] Required DOM elements not found');
-            return;
-        }
-
-        elements.menuScreen.addEventListener('click', handleMenuClick);
-        elements.winModal.addEventListener('click', hideWinModal);
-
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape' && elements.winModal.classList.contains(CONFIG.CLASSES.MODAL_VISIBLE)) {
-                hideWinModal();
+        document.getElementById('menu-screen').addEventListener('click', e => {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            
+            switch (btn.dataset.action) {
+                case 'start':
+                    state.matched = 0;
+                    state.cards = [];
+                    state.locked = false;
+                    createBoard();
+                    document.getElementById('menu-screen').classList.remove('screen--active');
+                    document.getElementById('game-screen').classList.add('screen--active');
+                    break;
+                case 'update':
+                case 'confirm-update':
+                    performUpdate();
+                    break;
+                case 'decline-update':
+                    declineUpdate();
+                    break;
+                case 'exit':
+                    if (confirm('Выйти?')) {
+                        window.close();
+                        document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;color:white;"><h1>Можно закрыть</h1></div>';                    }
+                    break;
             }
         });
 
-        // Сначала регистрируем SW
-        registerServiceWorker();
-        
-        // Затем проверяем обновления (версия покажется в UI)        checkForUpdates();
-        
-        console.log('[APP] Cards game initialized v' + APP_VERSION);
+        document.getElementById('win-modal').onclick = () => {
+            document.getElementById('win-modal').classList.remove('modal--visible');
+            document.getElementById('game-screen').classList.remove('screen--active');
+            document.getElementById('menu-screen').classList.add('screen--active');
+        };
+
+        document.getElementById('update-modal').onclick = e => {
+            if (e.target.id === 'update-modal') hideUpdateModal();
+        };
     }
 
     if (document.readyState === 'loading') {
