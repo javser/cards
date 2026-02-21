@@ -1,17 +1,12 @@
 (function() {
     'use strict';
 
-    const APP_VERSION = '2.1.4';
-    const STORAGE = {
-        VERSION: 'cards_version',
-        DECLINED: 'cards_declined',
-        PENDING: 'cards_pending'
-    };
+    const APP_VERSION = '2.1.5';
+    const STORAGE = { VERSION: 'cards_version', DECLINED: 'cards_declined', PENDING: 'cards_pending' };
 
     let swRegistration = null;
     let availableVersion = null;
 
-    // --- Версия ---
     function getStoredVersion() {
         return localStorage.getItem(STORAGE.VERSION) || APP_VERSION;
     }
@@ -48,24 +43,22 @@
     async function checkForUpdates() {
         const current = getStoredVersion();
         showVersion(current);
+
         try {
             const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-cache' });
             if (!res.ok) throw new Error('Network');
-            
-            const data = await res.json();
+                        const data = await res.json();
             availableVersion = data.version;
             const declined = localStorage.getItem(STORAGE.DECLINED);
 
             if (compareVersions(availableVersion, current) > 0 && 
                 (!declined || compareVersions(availableVersion, declined) > 0)) {
-                
                 localStorage.setItem(STORAGE.PENDING, 'true');
                 showUpdateModal(data.changelog);
             } else if (localStorage.getItem(STORAGE.PENDING) === 'true') {
                 showUpdateButton();
             }
         } catch (e) {
-            console.log('Offline mode');
             if (localStorage.getItem(STORAGE.PENDING) === 'true') {
                 showUpdateButton();
             }
@@ -96,15 +89,14 @@
         hideUpdateModal();
         showUpdateButton();
     }
-    // --- Service Worker ---
+
     function registerSW() {
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js', { scope: './' })
                 .then(reg => {
                     swRegistration = reg;
                     if (reg.active) {
-                        reg.active.postMessage({ type: 'SET_VERSION', version: APP_VERSION });
-                    }
+                        reg.active.postMessage({ type: 'SET_VERSION', version: APP_VERSION });                    }
                     reg.addEventListener('updatefound', () => {
                         const newWorker = reg.installing;
                         if (newWorker) {
@@ -119,7 +111,6 @@
         }
     }
 
-    // --- Игра ---
     const state = { cards: [], matched: 0, locked: false };
     
     function createBoard() {
@@ -145,7 +136,8 @@
         state.cards.push(card);
         
         if (state.cards.length === 2) {
-            state.locked = true;            const [c1, c2] = state.cards;
+            state.locked = true;
+            const [c1, c2] = state.cards;
             if (c1.dataset.value === c2.dataset.value) {
                 c1.classList.add('card--matched');
                 c2.classList.add('card--matched');
@@ -153,8 +145,7 @@
                 state.cards = [];
                 state.locked = false;
                 if (state.matched === 8) {
-                    setTimeout(() => document.getElementById('win-modal').classList.add('modal--visible'), 500);
-                }
+                    setTimeout(() => document.getElementById('win-modal').classList.add('modal--visible'), 500);                }
             } else {
                 setTimeout(() => {
                     c1.classList.remove('card--flipped');
@@ -166,11 +157,11 @@
         }
     }
 
-    // --- Инициализация ---
     function init() {
         registerSW();
         checkForUpdates();
 
+        // Обработчик для меню
         document.getElementById('menu-screen').addEventListener('click', e => {
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
@@ -184,30 +175,49 @@
                     document.getElementById('menu-screen').classList.remove('screen--active');
                     document.getElementById('game-screen').classList.add('screen--active');
                     break;
-                case 'update':
-                case 'confirm-update':
-                    performUpdate();
-                    break;
-                case 'decline-update':
-                    declineUpdate();
-                    break;
                 case 'exit':
                     if (confirm('Выйти?')) {
                         window.close();
-                        document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;color:white;"><h1>Можно закрыть</h1></div>';                    }
+                        document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;color:white;"><h1>Можно закрыть</h1></div>';
+                    }
                     break;
             }
         });
 
-        document.getElementById('win-modal').onclick = () => {
-            document.getElementById('win-modal').classList.remove('modal--visible');
-            document.getElementById('game-screen').classList.remove('screen--active');
-            document.getElementById('menu-screen').classList.add('screen--active');
-        };
+        // Обработчик для модального окна обновления
+        document.getElementById('update-modal').addEventListener('click', e => {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            
+            if (btn.dataset.action === 'confirm-update') {
+                performUpdate();
+            } else if (btn.dataset.action === 'decline-update') {
+                declineUpdate();
+            }
+        });
+        // Закрытие модальных окон по клику на фон
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', e => {
+                if (e.target === modal) {
+                    modal.classList.remove('modal--visible');
+                }
+            });
+        });
 
-        document.getElementById('update-modal').onclick = e => {
-            if (e.target.id === 'update-modal') hideUpdateModal();
-        };
+        // Кнопка обновления в меню
+        document.querySelector('.btn--update').addEventListener('click', e => {
+            e.stopPropagation();
+            performUpdate();
+        });
+
+        // Победа
+        document.getElementById('win-modal').addEventListener('click', e => {
+            if (e.target.id === 'win-modal') {
+                document.getElementById('win-modal').classList.remove('modal--visible');
+                document.getElementById('game-screen').classList.remove('screen--active');
+                document.getElementById('menu-screen').classList.add('screen--active');
+            }
+        });
     }
 
     if (document.readyState === 'loading') {
